@@ -2,20 +2,80 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
 <style>
-body{margin:0;font-family:sans-serif;background:#0b3d2e;color:white}
+body{
+  margin:0;
+  font-family:sans-serif;
+  background:#0b3d2e;
+  color:white;
+}
+
+.header{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px;
+  background:#06281f;
+  cursor:pointer;
+}
+
 .container{padding:10px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
-.card{background:#145a32;padding:10px;border-radius:10px;transition:.3s}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:10px;
+}
+
+.card{
+  background:#145a32;
+  padding:10px;
+  border-radius:10px;
+  transition:.3s;
+}
+
 .card:hover{transform:scale(1.05)}
-button{padding:8px;border:none;background:#00c853;color:white;border-radius:5px}
+
+button{
+  padding:8px;
+  border:none;
+  background:#00c853;
+  color:white;
+  border-radius:5px;
+  cursor:pointer;
+}
+
+.topbar{
+ display:flex;
+ flex-wrap:wrap;
+ gap:10px;
+ align-items:center;
+ margin-bottom:10px;
+}
+
+.bar{
+ height:8px;
+ background:#333;
+ border-radius:5px;
+ overflow:hidden;
+ margin-top:5px;
+}
+
+.fill{
+ height:100%;
+ background:#00e676;
+}
 </style>
 </head>
 
 <body>
-<div class="container">
 
-<h2>⚽ Mundial 2026</h2>
+<div class="header" onclick="goHome()">
+  ⚽ <h2>Mundial 2026</h2>
+</div>
+
+<div class="container">
 
 <div id="auth">
 <input id="user" placeholder="Usuario">
@@ -25,13 +85,24 @@ button{padding:8px;border:none;background:#00c853;color:white;border-radius:5px}
 </div>
 
 <div id="app" style="display:none">
-<div id="groups" class="grid"></div>
-<div id="detail"></div>
+
+  <div class="topbar">
+    <div id="stats"></div>
+
+    <button onclick="showMissing()">📋 Me faltan</button>
+    <button onclick="copyMissing()">📤 Copiar</button>
+    <button onclick="compareWithUser()">🤝 Comparar</button>
+  </div>
+
+  <div id="groups" class="grid"></div>
+  <div id="detail"></div>
+
 </div>
 
 </div>
 
 <script>
+
 let userId=null;
 let progressData={};
 
@@ -57,6 +128,10 @@ function generate(code){
  return Array.from({length:20},(_,i)=>code+"-"+(i+1));
 }
 
+function goHome(){
+ document.getElementById("detail").innerHTML="";
+}
+
 async function load(){
  let r=await fetch('/progress/'+userId);
  let data=await r.json();
@@ -65,42 +140,78 @@ async function load(){
 }
 
 function render(){
+
  let g=document.getElementById("groups");
  g.innerHTML="";
 
  for(let k in groups){
+
   let all=[];
   groups[k].forEach(t=>all.push(...generate(t)));
 
   let have=all.filter(x=>progressData[x]).length;
+  let percent=Math.round((have/all.length)*100);
 
   g.innerHTML+=`
   <div class="card">
     <h3>${k}</h3>
     <p>${have}/${all.length}</p>
+
+    <div class="bar">
+      <div class="fill" style="width:${percent}%"></div>
+    </div>
+
     <button onclick="openGroup('${k}')">Entrar</button>
   </div>`;
  }
+
+ renderStats();
+}
+
+function renderStats(){
+ let total=0,have=0;
+
+ for(let g in groups){
+   groups[g].forEach(t=>{
+     let s=generate(t);
+     total+=s.length;
+     have+=s.filter(x=>progressData[x]).length;
+   });
+ }
+
+ let p=Math.round((have/total)*100);
+ document.getElementById("stats").innerText=`Total: ${have}/${total} (${p}%)`;
 }
 
 function openGroup(k){
+
  let d=document.getElementById("detail");
  d.innerHTML="";
 
  groups[k].forEach(t=>{
-  d.innerHTML+=`<h4>${t}</h4>`;
 
-  generate(t).forEach(s=>{
-   let val=progressData[s]?1:0;
+  let stickers=generate(t);
+  let owned=stickers.filter(s=>progressData[s]).length;
+  let percent=Math.round((owned/stickers.length)*100);
 
-   d.innerHTML+=`
-   <div>
-     ${s}
-     <select onchange="setVal('${s}',this.value)">
-       <option ${val==0?"selected":""}>NO</option>
-       <option ${val==1?"selected":""}>SI</option>
-     </select>
-   </div>`;
+  d.innerHTML+=`
+  <h3>${t} (${owned}/${stickers.length})</h3>
+  <div class="bar">
+    <div class="fill" style="width:${percent}%"></div>
+  </div>
+  `;
+
+  stickers.forEach(s=>{
+    let val=progressData[s]?1:0;
+
+    d.innerHTML+=`
+    <div>
+      ${s}
+      <select onchange="setVal('${s}',this.value)">
+        <option ${val==0?"selected":""}>NO</option>
+        <option ${val==1?"selected":""}>SI</option>
+      </select>
+    </div>`;
   });
  });
 }
@@ -116,6 +227,76 @@ async function setVal(s,v){
  });
 
  render();
+}
+
+function showMissing(){
+ let d=document.getElementById("detail");
+ d.innerHTML="<h2>Te faltan:</h2>";
+
+ for(let g in groups){
+  let list=[];
+
+  groups[g].forEach(t=>{
+    generate(t).forEach(s=>{
+      if(!progressData[s]) list.push(s);
+    });
+  });
+
+  if(list.length){
+    d.innerHTML+=`<h3>${g}</h3>`;
+    list.forEach(s=>d.innerHTML+=`<div>${s}</div>`);
+  }
+ }
+}
+
+function copyMissing(){
+ let list=[];
+
+ for(let g in groups){
+   groups[g].forEach(t=>{
+     generate(t).forEach(s=>{
+       if(!progressData[s]) list.push(s);
+     });
+   });
+ }
+
+ let text="Me faltan:\\n\\n"+list.join("\\n");
+ navigator.clipboard.writeText(text);
+ alert("Copiado 📱");
+}
+
+async function compareWithUser(){
+ const other=prompt("ID del otro usuario");
+ if(!other) return;
+
+ const res=await fetch('/progress/'+other);
+ const data=await res.json();
+
+ let otherData={};
+ data.forEach(x=>otherData[x.sticker]=x.owned);
+
+ let need=[],give=[];
+
+ for(let g in groups){
+   groups[g].forEach(t=>{
+     generate(t).forEach(s=>{
+       if(!progressData[s] && otherData[s]) need.push(s);
+       if(progressData[s] && !otherData[s]) give.push(s);
+     });
+   });
+ }
+
+ let d=document.getElementById("detail");
+
+ d.innerHTML=`
+ <h2>Intercambio</h2>
+
+ <h3>Te puede dar</h3>
+ ${need.map(s=>`<div>${s}</div>`).join("")}
+
+ <h3>Vos podés dar</h3>
+ ${give.map(s=>`<div>${s}</div>`).join("")}
+ `;
 }
 
 async function register(){
@@ -155,6 +336,7 @@ async function login(){
  await load();
  render();
 }
+
 </script>
 </body>
 </html>
