@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Mundial 2026</title>
+<style>
+body{font-family:Arial;background:#0b3d2e;color:white;margin:0}
+.container{max-width:900px;margin:auto;padding:10px}
+button{padding:8px;background:#00c853;color:white;border:none;border-radius:5px;margin:5px}
+.card{background:#145a32;padding:10px;margin:10px;border-radius:10px}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>⚽ Mundial 2026</h1>
+
+<div id="auth">
+<input id="user" placeholder="Usuario">
+<input id="pass" placeholder="Password" type="password">
+<button onclick="login()">Login</button>
+<button onclick="register()">Register</button>
+</div>
+
+<div id="app" style="display:none">
+<h2 id="welcome"></h2>
+<button onclick="showMissing()">📋 Me faltan</button>
+<button onclick="copyMissing()">📤 Copiar lista</button>
+<button onclick="compareWithUser()">🤝 Comparar</button>
+<div id="detail"></div>
+</div>
+</div>
+
+<script>
+let userId=null;
+let progressData={};
+
+function generateStickers(code){
+  if(code==="FWC") return Array.from({length:19},(_,i)=>"FWC-"+(i+1));
+  if(code==="CC") return Array.from({length:14},(_,i)=>"CC-"+(i+1));
+  return Array.from({length:20},(_,i)=>code+"-"+(i+1));
+}
+
+async function loadProgress(){
+ const res=await fetch(`/progress/${userId}`);
+ const data=await res.json();
+ progressData={};
+ data.forEach(r=>progressData[r.sticker]=r.owned);
+}
+
+function getMissingStickers(){
+ let missing=[];
+ ["ARG"].forEach(team=>{
+   generateStickers(team).forEach(s=>{
+     if(!progressData[s]) missing.push(s);
+   });
+ });
+ return missing;
+}
+
+function showMissing(){
+ const div=document.getElementById("detail");
+ div.innerHTML="<h2>Te faltan estas:</h2>";
+ getMissingStickers().forEach(s=>{
+   div.innerHTML+=`<div>${s}</div>`;
+ });
+}
+
+function copyMissing(){
+ const text="Me faltan:\n"+getMissingStickers().join("\n");
+ navigator.clipboard.writeText(text);
+ alert("Copiado");
+}
+
+async function compareWithUser(){
+ const other=prompt("ID usuario");
+ const res=await fetch(`/progress/${other}`);
+ const data=await res.json();
+ alert("Comparación lista");
+}
+
+function register(){
+ fetch('/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:user.value,password:pass.value})})
+}
+
+async function login(){
+ const r=await fetch('/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:user.value,password:pass.value})});
+ const data=await r.json();
+ userId=data.id;
+ document.getElementById("auth").style.display="none";
+ document.getElementById("app").style.display="block";
+ await loadProgress();
+}
+</script>
+</body>
+</html>
