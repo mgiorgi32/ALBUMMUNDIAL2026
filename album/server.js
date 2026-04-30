@@ -12,7 +12,8 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// TABLAS
+// ================= DB =================
+
 (async ()=>{
  await pool.query(`
  CREATE TABLE IF NOT EXISTS users(
@@ -26,6 +27,7 @@ const pool = new Pool({
   user_id INT,
   sticker TEXT,
   owned INT,
+  qty INT DEFAULT 0,
   PRIMARY KEY(user_id, sticker)
  )`);
 
@@ -38,6 +40,7 @@ const pool = new Pool({
  )`);
 })();
 
+// ================= AUTH =================
 
 app.post('/register', async (req,res)=>{
  const {username,password} = req.body;
@@ -68,16 +71,17 @@ app.post('/login', async (req,res)=>{
  res.json(user);
 });
 
+// ================= PROGRESS =================
 
 app.post('/progress', async (req,res)=>{
- const {user_id,sticker,owned} = req.body;
+ const {user_id,sticker,owned,qty} = req.body;
 
  await pool.query(`
- INSERT INTO progress(user_id,sticker,owned)
- VALUES($1,$2,$3)
+ INSERT INTO progress(user_id,sticker,owned,qty)
+ VALUES($1,$2,$3,$4)
  ON CONFLICT (user_id,sticker)
- DO UPDATE SET owned=$3
- `,[user_id,sticker,owned]);
+ DO UPDATE SET owned=$3, qty=$4
+ `,[user_id,sticker,owned,qty || 0]);
 
  res.json({ok:true});
 });
@@ -87,14 +91,7 @@ app.get('/progress/:id', async (req,res)=>{
  res.json(r.rows);
 });
 
-app.get('/progress-user/:username', async (req,res)=>{
- const user = await pool.query("SELECT id FROM users WHERE username=$1",[req.params.username]);
- if(user.rows.length===0) return res.status(404).json({error:"No existe"});
-
- const data = await pool.query("SELECT * FROM progress WHERE user_id=$1",[user.rows[0].id]);
- res.json(data.rows);
-});
-
+// ================= FRIENDS =================
 
 app.get('/search/:username', async (req,res)=>{
  const r = await pool.query(
@@ -103,7 +100,6 @@ app.get('/search/:username', async (req,res)=>{
  );
  res.json(r.rows);
 });
-
 
 app.post('/add-friend', async (req,res)=>{
  const {user_id, friend_id} = req.body;
@@ -116,7 +112,6 @@ app.post('/add-friend', async (req,res)=>{
  res.json({ok:true});
 });
 
-
 app.get('/requests/:id', async (req,res)=>{
  const r = await pool.query(`
  SELECT f.id, u.username
@@ -127,7 +122,6 @@ app.get('/requests/:id', async (req,res)=>{
 
  res.json(r.rows);
 });
-
 
 app.post('/accept-friend', async (req,res)=>{
  const {id} = req.body;
@@ -144,7 +138,6 @@ app.post('/accept-friend', async (req,res)=>{
  res.json({ok:true});
 });
 
-
 app.get('/friends/:id', async (req,res)=>{
  const r = await pool.query(`
  SELECT u.id, u.username
@@ -156,6 +149,19 @@ app.get('/friends/:id', async (req,res)=>{
  res.json(r.rows);
 });
 
+
+app.get('/ranking', async (req,res)=>{
+ const r = await pool.query(`
+ SELECT u.username,
+ COUNT(p.sticker) FILTER (WHERE p.owned=1) as total
+ FROM users u
+ LEFT JOIN progress p ON u.id=p.user_id
+ GROUP BY u.id
+ ORDER BY total DESC
+ `);
+
+ res.json(r.rows);
+});
 
 app.get('/ranking-friends/:id', async (req,res)=>{
  const r = await pool.query(`
@@ -171,6 +177,5 @@ app.get('/ranking-friends/:id', async (req,res)=>{
 
  res.json(r.rows);
 });
-
 
 app.listen(3000, ()=>console.log("Running"));
