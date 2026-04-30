@@ -12,7 +12,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// tablas
+// TABLAS
 (async ()=>{
  await pool.query(`
  CREATE TABLE IF NOT EXISTS users(
@@ -28,16 +28,19 @@ const pool = new Pool({
   owned INT,
   PRIMARY KEY(user_id, sticker)
  )`);
+
+ await pool.query(`
+ CREATE TABLE IF NOT EXISTS friends(
+  id SERIAL PRIMARY KEY,
+  user_id INT,
+  friend_id INT,
+  status TEXT
+ )`);
 })();
 
-// register
+
 app.post('/register', async (req,res)=>{
  const {username,password} = req.body;
-
- if(!username || !password){
-  return res.status(400).json({error:"Datos inválidos"});
- }
-
  const hash = await bcrypt.hash(password,10);
 
  try{
@@ -51,7 +54,6 @@ app.post('/register', async (req,res)=>{
  }
 });
 
-// login
 app.post('/login', async (req,res)=>{
  const {username,password} = req.body;
 
@@ -66,17 +68,16 @@ app.post('/login', async (req,res)=>{
  res.json(user);
 });
 
-// progress
+
 app.post('/progress', async (req,res)=>{
  const {user_id,sticker,owned} = req.body;
 
- await pool.query(
-  `INSERT INTO progress(user_id,sticker,owned)
-   VALUES($1,$2,$3)
-   ON CONFLICT (user_id,sticker)
-   DO UPDATE SET owned=$3`,
-  [user_id,sticker,owned]
- );
+ await pool.query(`
+ INSERT INTO progress(user_id,sticker,owned)
+ VALUES($1,$2,$3)
+ ON CONFLICT (user_id,sticker)
+ DO UPDATE SET owned=$3
+ `,[user_id,sticker,owned]);
 
  res.json({ok:true});
 });
@@ -86,4 +87,90 @@ app.get('/progress/:id', async (req,res)=>{
  res.json(r.rows);
 });
 
-app.listen(3000, ()=>console.log("Running on 3000"));
+app.get('/progress-user/:username', async (req,res)=>{
+ const user = await pool.query("SELECT id FROM users WHERE username=$1",[req.params.username]);
+ if(user.rows.length===0) return res.status(404).json({error:"No existe"});
+
+ const data = await pool.query("SELECT * FROM progress WHERE user_id=$1",[user.rows[0].id]);
+ res.json(data.rows);
+});
+
+
+app.get('/search/:username', async (req,res)=>{
+ const r = await pool.query(
+  "SELECT id, username FROM users WHERE username ILIKE $1 LIMIT 5",
+  ['%'+req.params.username+'%']
+ );
+ res.json(r.rows);
+});
+
+
+app.post('/add-friend', async (req,res)=>{
+ const {user_id, friend_id} = req.body;
+
+ await pool.query(`
+ INSERT INTO friends(user_id,friend_id,status)
+ VALUES($1,$2,'pending')
+ `,[user_id,friend_id]);
+
+ res.json({ok:true});
+});
+
+
+app.get('/requests/:id', async (req,res)=>{
+ const r = await pool.query(`
+ SELECT f.id, u.username
+ FROM friends f
+ JOIN users u ON u.id = f.user_id
+ WHERE f.friend_id=$1 AND f.status='pending'
+ `,[req.params.id]);
+
+ res.json(r.rows);
+});
+
+
+app.post('/accept-friend', async (req,res)=>{
+ const {id} = req.body;
+
+ const r = await pool.query("SELECT * FROM friends WHERE id=$1",[id]);
+
+ await pool.query("UPDATE friends SET status='accepted' WHERE id=$1",[id]);
+
+ await pool.query(`
+ INSERT INTO friends(user_id,friend_id,status)
+ VALUES($1,$2,'accepted')
+ `,[r.rows[0].friend_id, r.rows[0].user_id]);
+
+ res.json({ok:true});
+});
+
+
+app.get('/friends/:id', async (req,res)=>{
+ const r = await pool.query(`
+ SELECT u.id, u.username
+ FROM friends f
+ JOIN users u ON u.id = f.friend_id
+ WHERE f.user_id=$1 AND f.status='accepted'
+ `,[req.params.id]);
+
+ res.json(r.rows);
+});
+
+
+app.get('/ranking-friends/:id', async (req,res)=>{
+ const r = await pool.query(`
+ SELECT u.username,
+ COUNT(p.sticker) FILTER (WHERE p.owned=1) as total
+ FROM friends f
+ JOIN users u ON u.id = f.friend_id
+ LEFT JOIN progress p ON u.id=p.user_id
+ WHERE f.user_id=$1
+ GROUP BY u.username
+ ORDER BY total DESC
+ `,[req.params.id]);
+
+ res.json(r.rows);
+});
+
+
+app.listen(3000, ()=>console.log("Running"));
