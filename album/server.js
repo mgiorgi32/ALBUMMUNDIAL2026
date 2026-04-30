@@ -91,6 +91,14 @@ app.get('/progress/:id', async (req,res)=>{
  res.json(r.rows);
 });
 
+app.get('/progress-user/:username', async (req,res)=>{
+ const user = await pool.query("SELECT id FROM users WHERE username=$1",[req.params.username]);
+ if(user.rows.length===0) return res.status(404).json({error:"No existe"});
+
+ const data = await pool.query("SELECT * FROM progress WHERE user_id=$1",[user.rows[0].id]);
+ res.json(data.rows);
+});
+
 // ================= FRIENDS =================
 
 app.get('/search/:username', async (req,res)=>{
@@ -149,6 +157,7 @@ app.get('/friends/:id', async (req,res)=>{
  res.json(r.rows);
 });
 
+// ================= RANKING =================
 
 app.get('/ranking', async (req,res)=>{
  const r = await pool.query(`

@@ -3,6 +3,12 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
+<link rel="icon" href="data:image/svg+xml,
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>
+<circle cx='50' cy='50' r='50' fill='white'/>
+<polygon points='50,15 65,40 35,40' fill='black'/>
+</svg>">
+
 <style>
 
 body{
@@ -12,14 +18,30 @@ body{
  color:white;
 }
 
+/* LOGIN */
+.login-container{
+ display:flex;
+ justify-content:center;
+ align-items:center;
+ height:100vh;
+}
+
+.login-box{
+ background:#063d2e;
+ padding:30px;
+ border-radius:10px;
+ display:flex;
+ flex-direction:column;
+ gap:10px;
+ width:250px;
+ text-align:center;
+}
+
 /* HEADER */
 .header{
- display:flex;
- align-items:center;
  padding:12px;
  background:#021e16;
  border-bottom:2px solid #00e676;
- font-weight:bold;
  cursor:pointer;
 }
 
@@ -34,18 +56,12 @@ body{
 button{
  background:#00e676;
  border:none;
- padding:8px 12px;
+ padding:8px;
  border-radius:6px;
- color:#003d2e;
- font-weight:bold;
  cursor:pointer;
 }
 
-button:hover{
- transform:scale(1.05);
-}
-
-/* GRUPOS */
+/* GRID */
 .grid{
  display:grid;
  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
@@ -59,11 +75,27 @@ button:hover{
  border-radius:10px;
 }
 
+/* PROGRESS */
+.bar{
+ height:10px;
+ background:#333;
+ border-radius:5px;
+ overflow:hidden;
+ margin-top:5px;
+}
+
+.fill{
+ height:100%;
+ background:#00e676;
+ width:0%;
+ transition:width 0.6s ease;
+}
+
 /* DETALLE */
 .group-row{
  display:flex;
- gap:20px;
  flex-wrap:wrap;
+ gap:15px;
  padding:10px;
 }
 
@@ -71,7 +103,7 @@ button:hover{
  background:#063d2e;
  padding:10px;
  border-radius:10px;
- min-width:180px;
+ min-width:160px;
 }
 
 .sticker{
@@ -94,27 +126,38 @@ input{
 
 <body>
 
-<div class="header" onclick="goHome()">⚽ Mundial 2026</div>
-
-<div id="auth" style="padding:10px;">
+<div id="auth" class="login-container">
+<div class="login-box">
+<h2>⚽ Mundial 2026</h2>
 <input id="user" placeholder="Usuario">
 <input id="pass" type="password" placeholder="Password">
 <button onclick="login()">Login</button>
 <button onclick="register()">Register</button>
 </div>
+</div>
 
 <div id="app" style="display:none">
+
+<div class="header" onclick="goHome()">⚽ Mundial 2026</div>
 
 <div class="actions">
 <button onclick="buscar()">🔎 Buscar</button>
 <button onclick="showMissing()">📋 Me faltan</button>
 <button onclick="cambiarFiguritas()">🔄 Cambiar figuritas</button>
 <button onclick="compareWithUser()">🤝 Comparar</button>
-<button onclick="loadRanking()">🏆 Global</button>
-<button onclick="rankingFriends()">🏆 Amigos</button>
-<button onclick="searchUser()">👥 Agregar</button>
+
+<button onclick="loadRanking()">🏆 Ranking Global</button>
+<button onclick="rankingFriends()">🏆 Ranking Amigos</button>
+
+<button onclick="searchUser()">👥 Buscar usuarios</button>
 <button onclick="loadRequests()">📥 Solicitudes</button>
-<button onclick="loadFriends()">👥 Lista amigos</button>
+<button onclick="loadFriends()">👥 Amigos</button>
+</div>
+
+<div style="padding:10px;">
+<h3>Progreso total</h3>
+<div class="bar"><div id="totalBar" class="fill"></div></div>
+<div id="totalText"></div>
 </div>
 
 <div id="groups" class="grid"></div>
@@ -159,10 +202,7 @@ async function load(){
 
  progressData={};
  data.forEach(x=>{
-  progressData[x.sticker]={
-   owned:x.owned,
-   qty:x.qty
-  };
+  progressData[x.sticker]={owned:x.owned,qty:x.qty};
  });
 }
 
@@ -171,6 +211,8 @@ function render(){
  let g=document.getElementById("groups");
  g.innerHTML="";
 
+ let total=0,have=0;
+
  for(let k in groups){
 
   let all=[];
@@ -178,17 +220,26 @@ function render(){
 
   let owned=all.filter(s=>progressData[s]?.owned).length;
 
+  total+=all.length;
+  have+=owned;
+
+  let percent=Math.round((owned/all.length)*100);
+
   g.innerHTML+=`
   <div class="card">
    <h3>${k}</h3>
    <p>${owned}/${all.length}</p>
+   <div class="bar"><div class="fill" style="width:${percent}%"></div></div>
    <button onclick="openGroup('${k}')">Entrar</button>
   </div>`;
  }
+
+ let percentTotal=Math.round((have/total)*100);
+ document.getElementById("totalBar").style.width=percentTotal+"%";
+ document.getElementById("totalText").innerText=`${have}/${total} (${percentTotal}%)`;
 }
 
 function openGroup(g){
-
  let d=document.getElementById("detail");
  d.innerHTML=`<h2>${g}</h2>`;
 
@@ -196,13 +247,11 @@ function openGroup(g){
  row.className="group-row";
 
  groups[g].forEach(t=>{
-
   let box=document.createElement("div");
   box.className="team-box";
 
   generate(t).forEach(s=>{
-
-   let data=progressData[s] || {owned:0,qty:0};
+   let data=progressData[s]||{owned:0,qty:0};
 
    let item=document.createElement("div");
    item.className="sticker "+(data.owned?"owned":"");
@@ -213,9 +262,8 @@ function openGroup(g){
       <option ${!data.owned?"selected":""}>NO</option>
       <option ${data.owned?"selected":""}>SI</option>
     </select>
-    <input type="number" min="0" value="${data.qty}"
-      ${!data.owned?"disabled":""}
-      onchange="setQty('${s}',this.value)">
+    <input type="number" value="${data.qty}" ${!data.owned?"disabled":""}
+     onchange="setQty('${s}',this.value)">
    `;
 
    box.appendChild(item);
@@ -228,22 +276,16 @@ function openGroup(g){
 }
 
 async function setVal(s,v){
-
- let data=progressData[s] || {qty:0};
- data.owned = v==="SI"?1:0;
- if(!data.owned) data.qty=0;
-
+ let data=progressData[s]||{qty:0};
+ data.owned=v==="SI"?1:0;
+ if(!data.owned)data.qty=0;
  progressData[s]=data;
-
  await save(s);
  render();
 }
 
 async function setQty(s,v){
-
- let data=progressData[s];
- data.qty=parseInt(v)||0;
-
+ progressData[s].qty=parseInt(v)||0;
  await save(s);
 }
 
@@ -307,7 +349,6 @@ function showMissing(){
 }
 
 async function cambiarFiguritas(){
-
  let resFriends = await fetch('/friends/'+userId);
  let friends = await resFriends.json();
 
@@ -319,7 +360,6 @@ async function cambiarFiguritas(){
  d.innerHTML="<h2>Cambios posibles</h2>";
 
  for(let f of friends){
-
   let r = await fetch('/progress/'+f.id);
   let data = await r.json();
 
@@ -335,29 +375,141 @@ async function cambiarFiguritas(){
  }
 }
 
-/* ================= AUTH ================= */
+async function compareWithUser(){
+ const other = prompt("Username");
+ if(!other) return;
 
-async function register(){
- await fetch('/register',{
-  method:'POST',
-  headers:{'Content-Type':'application/json'},
-  body:JSON.stringify({username:user.value,password:pass.value})
- });
- alert("Usuario creado");
+ const res = await fetch('/progress-user/'+other);
+ if(!res.ok){alert("Usuario no existe");return;}
+
+ const data = await res.json();
+
+ let otherData={};
+ data.forEach(x=>otherData[x.sticker]=x.owned);
+
+ let need=[],give=[];
+
+ for(let g in groups){
+  groups[g].forEach(t=>{
+    generate(t).forEach(s=>{
+      if(!progressData[s]?.owned && otherData[s]) need.push(s);
+      if(progressData[s]?.owned && !otherData[s]) give.push(s);
+    });
+  });
+ }
+
+ let d=document.getElementById("detail");
+
+ d.innerHTML=`
+ <h2>Comparación</h2>
+ <h3>Vos no tenés y él sí</h3>
+ ${need.map(s=>`<div>${s}</div>`).join("")}
+ <h3>Él no tiene y vos sí</h3>
+ ${give.map(s=>`<div>${s}</div>`).join("")}
+ `;
 }
 
-async function login(){
+/* ================= AMIGOS ================= */
 
+async function searchUser(){
+ const name = prompt("Buscar usuario");
+ if(!name) return;
+
+ const res = await fetch('/search/'+name);
+ const data = await res.json();
+
+ let d=document.getElementById("detail");
+ d.innerHTML="<h2>Resultados</h2>";
+
+ data.forEach(u=>{
+  d.innerHTML+=`
+  <div>
+   ${u.username}
+   <button onclick="addFriend(${u.id})">Agregar</button>
+  </div>`;
+ });
+}
+
+async function addFriend(id){
+ await fetch('/add-friend',{
+  method:'POST',
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({user_id:userId,friend_id:id})
+ });
+ alert("Solicitud enviada");
+}
+
+async function loadRequests(){
+ const res = await fetch('/requests/'+userId);
+ const data = await res.json();
+
+ let d=document.getElementById("detail");
+ d.innerHTML="<h2>Solicitudes</h2>";
+
+ data.forEach(r=>{
+  d.innerHTML+=`
+  <div>
+   ${r.username}
+   <button onclick="acceptFriend(${r.id})">Aceptar</button>
+  </div>`;
+ });
+}
+
+async function acceptFriend(id){
+ await fetch('/accept-friend',{
+  method:'POST',
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({id})
+ });
+ alert("Aceptado");
+}
+
+async function loadFriends(){
+ const res = await fetch('/friends/'+userId);
+ const data = await res.json();
+
+ let d=document.getElementById("detail");
+ d.innerHTML="<h2>Amigos</h2>";
+
+ data.forEach(f=>{
+  d.innerHTML+=`<div>${f.username}</div>`;
+ });
+}
+
+async function rankingFriends(){
+ const res = await fetch('/ranking-friends/'+userId);
+ const data = await res.json();
+
+ let d=document.getElementById("detail");
+ d.innerHTML="<h2>Ranking Amigos</h2>";
+
+ data.forEach((u,i)=>{
+  d.innerHTML+=`<div>${i+1}. ${u.username} - ${u.total}</div>`;
+ });
+}
+
+async function loadRanking(){
+ const res = await fetch('/ranking');
+ const data = await res.json();
+
+ let d=document.getElementById("detail");
+ d.innerHTML="<h2>Ranking Global</h2>";
+
+ data.forEach((u,i)=>{
+  d.innerHTML+=`<div>${i+1}. ${u.username} - ${u.total}</div>`;
+ });
+}
+
+/* ================= AUTH ================= */
+
+async function login(){
  let r=await fetch('/login',{
   method:'POST',
   headers:{'Content-Type':'application/json'},
   body:JSON.stringify({username:user.value,password:pass.value})
  });
 
- if(!r.ok){
-  alert("Error login");
-  return;
- }
+ if(!r.ok){alert("Error login");return;}
 
  let data=await r.json();
  userId=data.id;
@@ -367,6 +519,15 @@ async function login(){
 
  await load();
  render();
+}
+
+async function register(){
+ await fetch('/register',{
+  method:'POST',
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({username:user.value,password:pass.value})
+ });
+ alert("Usuario creado");
 }
 
 </script>
