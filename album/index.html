@@ -1,94 +1,159 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>Mundial 2026</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-body{font-family:Arial;background:#0b3d2e;color:white;margin:0}
-.container{max-width:900px;margin:auto;padding:10px}
-button{padding:8px;background:#00c853;color:white;border:none;border-radius:5px;margin:5px}
-.card{background:#145a32;padding:10px;margin:10px;border-radius:10px}
+body{margin:0;font-family:sans-serif;background:#0b3d2e;color:white}
+.container{padding:10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.card{background:#145a32;padding:10px;border-radius:10px;transition:.3s}
+.card:hover{transform:scale(1.05)}
+button{padding:8px;border:none;background:#00c853;color:white;border-radius:5px}
 </style>
 </head>
+
 <body>
 <div class="container">
-<h1>⚽ Mundial 2026</h1>
+
+<h2>⚽ Mundial 2026</h2>
 
 <div id="auth">
 <input id="user" placeholder="Usuario">
-<input id="pass" placeholder="Password" type="password">
+<input id="pass" type="password" placeholder="Password">
 <button onclick="login()">Login</button>
 <button onclick="register()">Register</button>
 </div>
 
 <div id="app" style="display:none">
-<h2 id="welcome"></h2>
-<button onclick="showMissing()">📋 Me faltan</button>
-<button onclick="copyMissing()">📤 Copiar lista</button>
-<button onclick="compareWithUser()">🤝 Comparar</button>
+<div id="groups" class="grid"></div>
 <div id="detail"></div>
 </div>
+
 </div>
 
 <script>
 let userId=null;
 let progressData={};
 
-function generateStickers(code){
-  if(code==="FWC") return Array.from({length:19},(_,i)=>"FWC-"+(i+1));
-  if(code==="CC") return Array.from({length:14},(_,i)=>"CC-"+(i+1));
-  return Array.from({length:20},(_,i)=>code+"-"+(i+1));
+const groups={
+ "Grupo A":["MEX","KOR","RSA","CZE"],
+ "Grupo B":["CAN","SUI","QAT","BIH"],
+ "Grupo C":["BRA","MAR","SCO","HAI"],
+ "Grupo D":["USA","AUS","PAR","TUR"],
+ "Grupo E":["GER","ECU","CIV","CUW"],
+ "Grupo F":["NED","JPN","TUN","SWE"],
+ "Grupo G":["BEL","IRN","EGY","NZL"],
+ "Grupo H":["CPV","KSA","ESP","URU"],
+ "Grupo I":["FRA","SEN","NOR","IRQ"],
+ "Grupo J":["ALG","ARG","AUT","JOR"],
+ "Grupo K":["POR","COL","UZB","COD"],
+ "Grupo L":["ENG","CRO","PAN","GHA"],
+ "Extras":["FWC","CC"]
+};
+
+function generate(code){
+ if(code==="FWC") return Array.from({length:19},(_,i)=>"FWC-"+(i+1));
+ if(code==="CC") return Array.from({length:14},(_,i)=>"CC-"+(i+1));
+ return Array.from({length:20},(_,i)=>code+"-"+(i+1));
 }
 
-async function loadProgress(){
- const res=await fetch(`/progress/${userId}`);
- const data=await res.json();
+async function load(){
+ let r=await fetch('/progress/'+userId);
+ let data=await r.json();
  progressData={};
- data.forEach(r=>progressData[r.sticker]=r.owned);
+ data.forEach(x=>progressData[x.sticker]=x.owned);
 }
 
-function getMissingStickers(){
- let missing=[];
- ["ARG"].forEach(team=>{
-   generateStickers(team).forEach(s=>{
-     if(!progressData[s]) missing.push(s);
-   });
+function render(){
+ let g=document.getElementById("groups");
+ g.innerHTML="";
+
+ for(let k in groups){
+  let all=[];
+  groups[k].forEach(t=>all.push(...generate(t)));
+
+  let have=all.filter(x=>progressData[x]).length;
+
+  g.innerHTML+=`
+  <div class="card">
+    <h3>${k}</h3>
+    <p>${have}/${all.length}</p>
+    <button onclick="openGroup('${k}')">Entrar</button>
+  </div>`;
+ }
+}
+
+function openGroup(k){
+ let d=document.getElementById("detail");
+ d.innerHTML="";
+
+ groups[k].forEach(t=>{
+  d.innerHTML+=`<h4>${t}</h4>`;
+
+  generate(t).forEach(s=>{
+   let val=progressData[s]?1:0;
+
+   d.innerHTML+=`
+   <div>
+     ${s}
+     <select onchange="setVal('${s}',this.value)">
+       <option ${val==0?"selected":""}>NO</option>
+       <option ${val==1?"selected":""}>SI</option>
+     </select>
+   </div>`;
+  });
  });
- return missing;
 }
 
-function showMissing(){
- const div=document.getElementById("detail");
- div.innerHTML="<h2>Te faltan estas:</h2>";
- getMissingStickers().forEach(s=>{
-   div.innerHTML+=`<div>${s}</div>`;
+async function setVal(s,v){
+ let val=v==="SI"?1:0;
+ progressData[s]=val;
+
+ await fetch('/progress',{
+  method:'POST',
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({user_id:userId,sticker:s,owned:val})
  });
+
+ render();
 }
 
-function copyMissing(){
- const text="Me faltan:\n"+getMissingStickers().join("\n");
- navigator.clipboard.writeText(text);
- alert("Copiado");
-}
+async function register(){
+ let r=await fetch('/register',{
+  method:'POST',
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({username:user.value,password:pass.value})
+ });
 
-async function compareWithUser(){
- const other=prompt("ID usuario");
- const res=await fetch(`/progress/${other}`);
- const data=await res.json();
- alert("Comparación lista");
-}
+ if(!r.ok){
+  let err=await r.json();
+  alert(err.error);
+  return;
+ }
 
-function register(){
- fetch('/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:user.value,password:pass.value})})
+ alert("Usuario creado");
 }
 
 async function login(){
- const r=await fetch('/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:user.value,password:pass.value})});
- const data=await r.json();
+ let r=await fetch('/login',{
+  method:'POST',
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({username:user.value,password:pass.value})
+ });
+
+ if(!r.ok){
+  alert("Login incorrecto");
+  return;
+ }
+
+ let data=await r.json();
  userId=data.id;
+
  document.getElementById("auth").style.display="none";
  document.getElementById("app").style.display="block";
- await loadProgress();
+
+ await load();
+ render();
 }
 </script>
 </body>

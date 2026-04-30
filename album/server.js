@@ -1,56 +1,89 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
-const bodyParser = require('body-parser');
-const cors = require('cors');
+const bcrypt = require('bcrypt');
+const { Pool } = require('pg');
+const path = require('path');
 
 const app = express();
-app.use(cors());
-app.use(bodyParser.json());
-app.use(express.static('.'));
+app.use(express.json());
+app.use(express.static(path.join(__dirname)));
 
-const db = new sqlite3.Database('./album.db');
-
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE,
-    password TEXT
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS progress (
-    user_id INTEGER,
-    sticker TEXT,
-    owned INTEGER,
-    PRIMARY KEY(user_id, sticker)
-  )`);
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
 });
 
-app.post('/register', (req, res) => {
-  const { username, password } = req.body;
-  db.run("INSERT INTO users (username,password) VALUES (?,?)", [username, password], function(err){
-    if(err) return res.status(400).send(err.message);
-    res.send({ id: this.lastID });
-  });
+// tablas
+(async ()=>{
+ await pool.query(`
+ CREATE TABLE IF NOT EXISTS users(
+  id SERIAL PRIMARY KEY,
+  username TEXT UNIQUE,
+  password TEXT
+ )`);
+
+ await pool.query(`
+ CREATE TABLE IF NOT EXISTS progress(
+  user_id INT,
+  sticker TEXT,
+  owned INT,
+  PRIMARY KEY(user_id, sticker)
+ )`);
+})();
+
+// register
+app.post('/register', async (req,res)=>{
+ const {username,password} = req.body;
+
+ if(!username || !password){
+  return res.status(400).json({error:"Datos inválidos"});
+ }
+
+ const hash = await bcrypt.hash(password,10);
+
+ try{
+  const r = await pool.query(
+   "INSERT INTO users(username,password) VALUES($1,$2) RETURNING id",
+   [username,hash]
+  );
+  res.json(r.rows[0]);
+ }catch{
+  res.status(400).json({error:"Usuario ya existe"});
+ }
 });
 
-app.post('/login', (req, res) => {
-  const { username, password } = req.body;
-  db.get("SELECT * FROM users WHERE username=? AND password=?", [username,password], (err,row)=>{
-    if(!row) return res.status(401).send("Invalid");
-    res.send(row);
-  });
+// login
+app.post('/login', async (req,res)=>{
+ const {username,password} = req.body;
+
+ const r = await pool.query("SELECT * FROM users WHERE username=$1",[username]);
+ if(r.rows.length===0) return res.status(401).json({error:"Invalid"});
+
+ const user = r.rows[0];
+ const valid = await bcrypt.compare(password,user.password);
+
+ if(!valid) return res.status(401).json({error:"Invalid"});
+
+ res.json(user);
 });
 
-app.post('/progress', (req,res)=>{
-  const { user_id, sticker, owned } = req.body;
-  db.run(`INSERT OR REPLACE INTO progress(user_id, sticker, owned) VALUES(?,?,?)`, [user_id, sticker, owned]);
-  res.send("ok");
+// progress
+app.post('/progress', async (req,res)=>{
+ const {user_id,sticker,owned} = req.body;
+
+ await pool.query(
+  `INSERT INTO progress(user_id,sticker,owned)
+   VALUES($1,$2,$3)
+   ON CONFLICT (user_id,sticker)
+   DO UPDATE SET owned=$3`,
+  [user_id,sticker,owned]
+ );
+
+ res.json({ok:true});
 });
 
-app.get('/progress/:user_id', (req,res)=>{
-  db.all("SELECT * FROM progress WHERE user_id=?", [req.params.user_id], (err,rows)=>{
-    res.send(rows);
-  });
+app.get('/progress/:id', async (req,res)=>{
+ const r = await pool.query("SELECT * FROM progress WHERE user_id=$1",[req.params.id]);
+ res.json(r.rows);
 });
 
-app.listen(3000, ()=> console.log("Server running on http://localhost:3000"));
+app.listen(3000, ()=>console.log("Running on 3000"));
