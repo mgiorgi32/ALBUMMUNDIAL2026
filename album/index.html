@@ -209,7 +209,10 @@ async function load(){
 
  progressData={};
  data.forEach(x=>{
-  progressData[x.sticker]={owned:x.owned,qty:x.qty};
+  progressData[x.sticker]={
+    owned:x.owned,
+    qty: x.qty ?? 0
+  };
  });
 }
 
@@ -269,7 +272,7 @@ function openGroup(g){
       <option ${!data.owned?"selected":""}>NO</option>
       <option ${data.owned?"selected":""}>SI</option>
     </select>
-    <input type="number" value="${data.qty}" ${!data.owned?"disabled":""}
+    <input type="number" value="${data.qty ?? 0}" ${!data.owned?"disabled":""}
      onchange="setQty('${s}',this.value)">
    `;
 

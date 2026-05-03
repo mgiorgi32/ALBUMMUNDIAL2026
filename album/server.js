@@ -78,12 +78,19 @@ app.post('/progress', async (req,res)=>{
 
   let {user_id, sticker, owned, qty} = req.body;
 
+  // 🔒 VALIDACIÓN
   if(!user_id || !sticker){
     return res.status(400).json({error:"Datos inválidos"});
   }
 
-  owned = owned ? 1 : 0;
-  qty = parseInt(qty) || 0;
+  // 🔥 FIX DEFINITIVO (anti undefined / NaN)
+  owned = (owned === 1 || owned === "1") ? 1 : 0;
+
+  if(qty === undefined || qty === null || isNaN(qty)){
+    qty = 0;
+  }else{
+    qty = parseInt(qty);
+  }
 
   await pool.query(`
     INSERT INTO progress(user_id,sticker,owned,qty)
@@ -95,21 +102,34 @@ app.post('/progress', async (req,res)=>{
   res.json({ok:true});
 
  }catch(err){
-  console.error("ERROR /progress:", err); 
+  console.error("ERROR /progress:", err);
   res.status(500).json({error:"Server error"});
  }
 });
 
 app.get('/progress/:id', async (req,res)=>{
- const r = await pool.query("SELECT * FROM progress WHERE user_id=$1",[req.params.id]);
+ const r = await pool.query(
+   "SELECT * FROM progress WHERE user_id=$1",
+   [req.params.id]
+ );
  res.json(r.rows);
 });
 
 app.get('/progress-user/:username', async (req,res)=>{
- const user = await pool.query("SELECT id FROM users WHERE username=$1",[req.params.username]);
- if(user.rows.length===0) return res.status(404).json({error:"No existe"});
+ const user = await pool.query(
+   "SELECT id FROM users WHERE username=$1",
+   [req.params.username]
+ );
 
- const data = await pool.query("SELECT * FROM progress WHERE user_id=$1",[user.rows[0].id]);
+ if(user.rows.length===0){
+   return res.status(404).json({error:"No existe"});
+ }
+
+ const data = await pool.query(
+   "SELECT * FROM progress WHERE user_id=$1",
+   [user.rows[0].id]
+ );
+
  res.json(data.rows);
 });
 
@@ -148,9 +168,19 @@ app.get('/requests/:id', async (req,res)=>{
 app.post('/accept-friend', async (req,res)=>{
  const {id} = req.body;
 
- const r = await pool.query("SELECT * FROM friends WHERE id=$1",[id]);
+ const r = await pool.query(
+   "SELECT * FROM friends WHERE id=$1",
+   [id]
+ );
 
- await pool.query("UPDATE friends SET status='accepted' WHERE id=$1",[id]);
+ if(!r.rows.length){
+   return res.status(404).json({error:"Solicitud no encontrada"});
+ }
+
+ await pool.query(
+   "UPDATE friends SET status='accepted' WHERE id=$1",
+   [id]
+ );
 
  await pool.query(`
  INSERT INTO friends(user_id,friend_id,status)
@@ -201,4 +231,6 @@ app.get('/ranking-friends/:id', async (req,res)=>{
  res.json(r.rows);
 });
 
-app.listen(3000, ()=>console.log("Running"));
+// ================= SERVER =================
+
+app.listen(3000, ()=>console.log("Running on port 3000"));
