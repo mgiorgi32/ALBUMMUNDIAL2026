@@ -272,8 +272,12 @@ function openGroup(g){
       <option ${!data.owned?"selected":""}>NO</option>
       <option ${data.owned?"selected":""}>SI</option>
     </select>
-    <input type="number" value="${data.qty ?? 0}" ${!data.owned?"disabled":""}
-     onchange="setQty('${s}',this.value)">
+    <input 
+ id="qty-${s}"
+ type="number" 
+ value="${data.qty ?? 0}" 
+ ${!data.owned?"disabled":""}
+ onchange="setQty('${s}',this.value)">
    `;
 
    box.appendChild(item);
@@ -286,10 +290,27 @@ function openGroup(g){
 }
 
 async function setVal(s,v){
- let data=progressData[s]||{qty:0};
- data.owned=v==="SI"?1:0;
- if(!data.owned)data.qty=0;
- progressData[s]=data;
+
+ let data = progressData[s] || {qty:0};
+
+ data.owned = v==="SI" ? 1 : 0;
+
+ if(!data.owned){
+  data.qty = 0;
+ }
+
+ progressData[s] = data;
+
+ const input = document.getElementById("qty-"+s);
+
+ if(input){
+  input.disabled = !data.owned;
+
+  if(!data.owned){
+    input.value = 0;
+  }
+ }
+
  await save(s);
  render();
 }
