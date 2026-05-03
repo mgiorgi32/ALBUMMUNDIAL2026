@@ -74,16 +74,30 @@ app.post('/login', async (req,res)=>{
 // ================= PROGRESS =================
 
 app.post('/progress', async (req,res)=>{
- const {user_id,sticker,owned,qty} = req.body;
+ try{
 
- await pool.query(`
- INSERT INTO progress(user_id,sticker,owned,qty)
- VALUES($1,$2,$3,$4)
- ON CONFLICT (user_id,sticker)
- DO UPDATE SET owned=$3, qty=$4
- `,[user_id,sticker,owned,qty || 0]);
+  let {user_id, sticker, owned, qty} = req.body;
 
- res.json({ok:true});
+  if(!user_id || !sticker){
+    return res.status(400).json({error:"Datos inválidos"});
+  }
+
+  owned = owned ? 1 : 0;
+  qty = parseInt(qty) || 0;
+
+  await pool.query(`
+    INSERT INTO progress(user_id,sticker,owned,qty)
+    VALUES($1,$2,$3,$4)
+    ON CONFLICT (user_id,sticker)
+    DO UPDATE SET owned=$3, qty=$4
+  `,[user_id, sticker, owned, qty]);
+
+  res.json({ok:true});
+
+ }catch(err){
+  console.error("ERROR /progress:", err); 
+  res.status(500).json({error:"Server error"});
+ }
 });
 
 app.get('/progress/:id', async (req,res)=>{
