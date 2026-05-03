@@ -292,19 +292,22 @@ async function setVal(s,v){
 }
 
 async function setQty(s,v){
- progressData[s].qty=parseInt(v)||0;
+ progressData[s].qty = parseInt(v) || 0;
  await save(s);
 }
 
 async function save(s){
+
+ const data = progressData[s] || {};
+
  await fetch('/progress',{
   method:'POST',
   headers:{'Content-Type':'application/json'},
   body:JSON.stringify({
    user_id:userId,
    sticker:s,
-   owned:progressData[s].owned,
-   qty:progressData[s].qty
+   owned:data.owned || 0,
+   qty: data.qty ?? 0 
   })
  });
 }
