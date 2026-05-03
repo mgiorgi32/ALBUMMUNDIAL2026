@@ -526,6 +526,10 @@ async function login(){
 
  let data=await r.json();
  userId=data.id;
+ if(!userId){
+ alert("Error: userId no definido");
+ return;
+}
 
  document.getElementById("auth").style.display="none";
  document.getElementById("app").style.display="block";

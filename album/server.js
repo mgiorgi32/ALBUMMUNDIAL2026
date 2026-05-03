@@ -78,19 +78,14 @@ app.post('/progress', async (req,res)=>{
 
   let {user_id, sticker, owned, qty} = req.body;
 
-  // 🔒 VALIDACIÓN
+  console.log("BODY:", req.body); 
+
   if(!user_id || !sticker){
     return res.status(400).json({error:"Datos inválidos"});
   }
 
-  // 🔥 FIX DEFINITIVO (anti undefined / NaN)
-  owned = (owned === 1 || owned === "1") ? 1 : 0;
-
-  if(qty === undefined || qty === null || isNaN(qty)){
-    qty = 0;
-  }else{
-    qty = parseInt(qty);
-  }
+  owned = owned ? 1 : 0;
+  qty = Number(qty) || 0;
 
   await pool.query(`
     INSERT INTO progress(user_id,sticker,owned,qty)
@@ -102,7 +97,7 @@ app.post('/progress', async (req,res)=>{
   res.json({ok:true});
 
  }catch(err){
-  console.error("ERROR /progress:", err);
+  console.error("ERROR REAL:", err); // 👈 CLAVE
   res.status(500).json({error:"Server error"});
  }
 });
