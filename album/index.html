@@ -570,25 +570,61 @@ async function register(){
 }
 async function exportExcel(){
 
-    const cell_address = {c:C,r:R};
-    const cell_ref = XLSX.utils.encode_cell(cell_address);
+ const wb = XLSX.utils.book_new();
 
-    if(!ws[cell_ref]) continue;
+ let resumen = [];
 
-    ws[cell_ref].s = {};
+ for(let g in groups){
 
-    // header
-    if(R === 0){
-      ws[cell_ref].s = greenHeader;
-    }
+  let rows = [];
 
-    // owned green
-    if(R > 0 && rows[R][3] === "SI"){
-      ws[cell_ref].s = ownedStyle;
-    }
+  rows.push([
+   "Equipo",
+   "Código",
+   "Número",
+   "La tengo?",
+   "Cantidad"
+  ]);
 
-   }
-  }
+  let total = 0;
+  let owned = 0;
+
+  groups[g].forEach(team=>{
+
+   generate(team).forEach(sticker=>{
+
+    total++;
+
+    let data = progressData[sticker] || {
+      owned:0,
+      qty:0
+    };
+
+    if(data.owned) owned++;
+
+    const split = sticker.split("-");
+
+    rows.push([
+      team,
+      split[0],
+      split[1],
+      data.owned ? "SI" : "NO",
+      data.qty || 0
+    ]);
+
+   });
+
+  });
+
+  let ws = XLSX.utils.aoa_to_sheet(rows);
+
+  ws['!cols'] = [
+    {wch:20},
+    {wch:10},
+    {wch:10},
+    {wch:15},
+    {wch:12}
+  ];
 
   XLSX.utils.book_append_sheet(wb, ws, g);
 
@@ -619,7 +655,6 @@ async function exportExcel(){
 
  XLSX.utils.book_append_sheet(wb,resumenWs,"Resumen");
 
- // descarga
  XLSX.writeFile(wb,"album_mundial_2026.xlsx");
 }
 </script>
