@@ -159,6 +159,7 @@ input{
 <button onclick="searchUser()">👥 Buscar usuarios</button>
 <button onclick="loadRequests()">📥 Solicitudes</button>
 <button onclick="loadFriends()">👥 Amigos</button>
+<button onclick="exportExcel()">📥 Exportar Excel</button>
 </div>
 
 <div style="padding:10px;">
@@ -567,8 +568,61 @@ async function register(){
  });
  alert("Usuario creado");
 }
+async function exportExcel(){
 
+    const cell_address = {c:C,r:R};
+    const cell_ref = XLSX.utils.encode_cell(cell_address);
+
+    if(!ws[cell_ref]) continue;
+
+    ws[cell_ref].s = {};
+
+    // header
+    if(R === 0){
+      ws[cell_ref].s = greenHeader;
+    }
+
+    // owned green
+    if(R > 0 && rows[R][3] === "SI"){
+      ws[cell_ref].s = ownedStyle;
+    }
+
+   }
+  }
+
+  XLSX.utils.book_append_sheet(wb, ws, g);
+
+  resumen.push([
+    g,
+    owned,
+    total,
+    Math.round((owned/total)*100)+"%"
+  ]);
+ }
+
+ // ================= RESUMEN =================
+
+ const resumenRows = [
+  ["Grupo","Tengo","Total","Porcentaje"]
+ ];
+
+ resumen.forEach(r=>resumenRows.push(r));
+
+ let resumenWs = XLSX.utils.aoa_to_sheet(resumenRows);
+
+ resumenWs['!cols'] = [
+  {wch:20},
+  {wch:12},
+  {wch:12},
+  {wch:15}
+ ];
+
+ XLSX.utils.book_append_sheet(wb,resumenWs,"Resumen");
+
+ // descarga
+ XLSX.writeFile(wb,"album_mundial_2026.xlsx");
+}
 </script>
-
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 </body>
 </html>
